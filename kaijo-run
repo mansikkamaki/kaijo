@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Launcher for Kaijo from the source tree."""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from kaijo.main import main
+
+sys.exit(main(sys.argv[1:]))
