@@ -20,7 +20,7 @@
 """Kaijo -- molecular orbital and molecular structure visualization."""
 
 APP_NAME = "Kaijo"
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 #: Short one-line description of the program.
 DESCRIPTION = ("A fast, simple molecular orbital and molecular structure "

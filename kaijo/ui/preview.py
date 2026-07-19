@@ -31,11 +31,15 @@ class PreviewCell(Gtk.Frame):
                      lambda w, e: on_activate(self.item))
         box.pack_start(ebox, True, True, 0)
 
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        # Caption can span several lines (orbital index, symmetry, energy,
+        # occupation), so wrap rather than ellipsize to a single line.
         self.label = Gtk.Label(label=item.describe())
-        self.label.set_ellipsize(3)  # Pango.EllipsizeMode.END
+        self.label.set_line_wrap(True)
+        self.label.set_justify(Gtk.Justification.LEFT)
         self.label.set_xalign(0.0)
-        hbox.pack_start(self.label, True, True, 2)
+        box.pack_start(self.label, False, False, 0)
+
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         if on_close is not None:
             close = Gtk.Button.new_from_icon_name(
                 "window-close-symbolic", Gtk.IconSize.MENU)
@@ -45,12 +49,13 @@ class PreviewCell(Gtk.Frame):
                                    "preview grid")
             close.connect("clicked", lambda b: on_close(self.item))
             hbox.pack_end(close, False, False, 0)
-        self.check = Gtk.CheckButton(label="export")
-        self.check.set_tooltip_text("Select this image for export")
+        self.check = Gtk.CheckButton(label="select")
+        self.check.set_tooltip_text(
+            "Select this window (for image export or the ORCA CAS tool)")
         self.check.set_active(item.export_selected)
         self.check.connect("toggled", lambda b: on_export_toggle(
             self.item, b.get_active()))
-        hbox.pack_end(self.check, False, False, 0)
+        hbox.pack_start(self.check, False, False, 2)
         box.pack_start(hbox, False, False, 0)
         self.show_all()
 

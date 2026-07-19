@@ -21,12 +21,20 @@ from ..render.camera import Camera
 from ..render.scene import (FieldItem, OrbitalItem, PlaneItem,
                             PolyhedronItem, Scene, VectorItem)
 from . import export as export_mod
+from .cas import CasDialog
 from .dialogs import (GridDialog, LengthDialog, OptionsDialog,
                       VectorDialog, show_about)
 from .gl_view import GLView
 from .orbital_panel import OrbitalPanel
 from .preview import PreviewGrid
 from .properties import PropertiesPanel
+
+
+def _orbital_label(mos, orb):
+    """Multi-line preview-cell caption: the per-spin file index and the
+    symmetry species/index, then the energy and occupation."""
+    return (f"MO {mos.name(orb)}   sym {mos.sym_name(orb)}\n"
+            f"E {mos.energies[orb]:.3f}   occ {mos.occupations[orb]:.2f}")
 
 
 class KaijoWindow(Gtk.ApplicationWindow):
@@ -102,9 +110,16 @@ class KaijoWindow(Gtk.ApplicationWindow):
         export_btn = Gtk.Button(label="Export images...")
         export_btn.get_style_context().add_class("suggested-action")
         export_btn.set_tooltip_text(
-            "Export the preview-grid images ticked for export")
+            "Export the preview-grid images ticked for selection")
         export_btn.connect("clicked", self._export_clicked)
         header.pack_end(export_btn)
+
+        cas_btn = Gtk.Button(label="Orca CAS")
+        cas_btn.set_tooltip_text(
+            "Build the ORCA CASSCF active-space rotations from the orbitals "
+            "selected in the preview grid")
+        cas_btn.connect("clicked", self._cas_clicked)
+        header.pack_end(cas_btn)
 
         opts_btn = Gtk.Button(label="Options")
         opts_btn.set_tooltip_text("Visualization options")
@@ -276,6 +291,15 @@ class KaijoWindow(Gtk.ApplicationWindow):
     def show_error(self, title, message):
         dlg = Gtk.MessageDialog(transient_for=self, modal=True,
                                 message_type=Gtk.MessageType.ERROR,
+                                buttons=Gtk.ButtonsType.OK, text=title)
+        dlg.format_secondary_text(message)
+        dlg.run()
+        dlg.destroy()
+        return False
+
+    def show_info(self, title, message):
+        dlg = Gtk.MessageDialog(transient_for=self, modal=True,
+                                message_type=Gtk.MessageType.INFO,
                                 buttons=Gtk.ButtonsType.OK, text=title)
         dlg.format_secondary_text(message)
         dlg.run()
@@ -482,8 +506,7 @@ class KaijoWindow(Gtk.ApplicationWindow):
         mos = self.data.orbitals
         for orb in wanted:
             if orb not in current:
-                label = f"MO {mos.name(orb)}  " \
-                        f"E={mos.energies[orb]:.4f}"
+                label = _orbital_label(mos, orb)
                 self.scene.add_item(OrbitalItem(orb, label))
         self._resort_items()
         self.preview.sync_items()
@@ -928,6 +951,42 @@ class KaijoWindow(Gtk.ApplicationWindow):
         return False
 
     # -------------------------------------------------------------- export
+
+    def _cas_clicked(self, *_a):
+        if self.data is None or not self.data.has_orbitals:
+            self.show_info(
+                "No orbitals loaded",
+                "Load a file with molecular orbitals before building an "
+                "ORCA active space.")
+            return
+        items = [i for i in self.scene.items if i.export_selected]
+        if not items:
+            self.show_info(
+                "No orbitals selected",
+                "Tick the 'select' box of the orbitals in the preview grid "
+                "that should form the CASSCF active space, then press "
+                "'Orca CAS' again.")
+            return
+        if any(i.kind != "orbital" for i in items):
+            self.show_error(
+                "Only orbitals allowed",
+                "The ORCA CAS tool works on molecular orbitals only. "
+                "Deselect any densities, ESP maps, the structure and "
+                "geometric objects in the preview grid.")
+            return
+        orbitals = self.data.orbitals
+        orb_indices = [i.orb_index for i in items]
+        if orbitals.unrestricted and any(
+                orbitals.spins[i] == 1 for i in orb_indices):
+            self.show_error(
+                "Alpha orbitals only",
+                "ORCA builds the CASSCF initial guess from the alpha "
+                "orbitals only, so beta orbitals cannot be used to define "
+                "the active space. Select alpha orbitals only.")
+            return
+        dlg = CasDialog(self, orbitals, orb_indices)
+        dlg.run()
+        dlg.destroy()
 
     def _export_clicked(self, *_a):
         if self.export_job is not None:

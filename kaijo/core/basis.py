@@ -14,9 +14,30 @@ speed:
   * shells whose coefficients are all negligible in the batch are skipped.
 """
 
+import re
+
 import numpy as np
 
 _SQRT_PI = np.sqrt(np.pi)
+
+# Strip the leading orbital number a program may pack into a molden Sym=
+# string ("1a1" -> "a1"); the remainder is the symmetry-species label.
+_SYM_LABEL_RE = re.compile(r"^\s*\d*\s*(.*?)\s*$")
+
+
+def _symmetry_species(label):
+    """Symmetry-species label from a raw molden Sym= string.
+
+    Molden writes the species prefixed by a running number ("1a", "23b1u");
+    only the species part is kept.  When no symmetry information is present
+    the label defaults to "a", the totally symmetric irrep of the C1 group.
+    """
+    if label:
+        m = _SYM_LABEL_RE.match(label)
+        species = (m.group(1) if m else label).strip()
+        if species:
+            return species
+    return "a"
 
 L_LABELS = {"s": 0, "p": 1, "d": 2, "f": 3, "g": 4}
 
@@ -100,6 +121,17 @@ class MolecularOrbitals:
     Orbitals are stored in file order; `display_order()` gives the order
     required by the UI: occupation descending, then energy ascending, with
     alpha and beta interleaved.
+
+    Two 1-based indices are assigned to every orbital, both counted in file
+    order:
+
+      * ``spin_index`` -- position within the orbital's own spin channel
+        (the order the file lists them in);
+      * ``sym_index``  -- position within the orbital's own (spin, symmetry
+        species) group.
+
+    ``sym_species`` holds the parsed symmetry label ("a" when the file
+    carries no symmetry information).
     """
 
     def __init__(self, coeffs, energies, occupations, spins, labels=None):
@@ -108,13 +140,19 @@ class MolecularOrbitals:
         self.occupations = np.asarray(occupations, dtype=np.float64)
         self.spins = np.asarray(spins, dtype=np.int8)  # 0 alpha, 1 beta
         self.labels = labels or [""] * len(self.energies)
-        # Index within its own spin channel (1-based), used for naming.
-        self.channel_index = np.zeros(len(self.energies), dtype=np.int32)
-        for spin in (0, 1):
-            idx = np.nonzero(self.spins == spin)[0]
-            order = idx[np.argsort(self.energies[idx], kind="stable")]
-            for rank, mo in enumerate(order):
-                self.channel_index[mo] = rank + 1
+        self.sym_species = [_symmetry_species(l) for l in self.labels]
+        n = len(self.energies)
+        self.spin_index = np.zeros(n, dtype=np.int32)
+        self.sym_index = np.zeros(n, dtype=np.int32)
+        spin_counts = {0: 0, 1: 0}
+        sym_counts = {}
+        for i in range(n):
+            s = int(self.spins[i])
+            spin_counts[s] += 1
+            self.spin_index[i] = spin_counts[s]
+            key = (s, self.sym_species[i])
+            sym_counts[key] = sym_counts.get(key, 0) + 1
+            self.sym_index[i] = sym_counts[key]
 
     @property
     def nmo(self):
@@ -129,11 +167,15 @@ class MolecularOrbitals:
         return keys
 
     def name(self, i):
-        """Short display name, e.g. '42a' / '42b' / '42'."""
-        n = str(self.channel_index[i])
+        """Per-spin file-order name, e.g. '42a' / '42b' / '42'."""
+        n = str(self.spin_index[i])
         if self.unrestricted:
             n += "ab"[self.spins[i]]
         return n
+
+    def sym_name(self, i):
+        """Symmetry species with its per-(spin, species) index, e.g. '3a'."""
+        return f"{self.sym_index[i]}{self.sym_species[i]}"
 
     def homo_index(self):
         """Highest-energy (at least half-)occupied orbital.  The 0.5

@@ -142,10 +142,10 @@ def make_filenames(items, orbitals, options):
     geo_items = [it for it in items if it.kind != "orbital"]
     names = {}
     if orb_items:
-        width = max(len(str(int(orbitals.channel_index[it.orb_index])))
+        width = max(len(str(int(orbitals.spin_index[it.orb_index])))
                     for it in orb_items)
         for it in orb_items:
-            idx = int(orbitals.channel_index[it.orb_index])
+            idx = int(orbitals.spin_index[it.orb_index])
             suffix = ""
             if orbitals.unrestricted:
                 suffix = "ab"[orbitals.spins[it.orb_index]]

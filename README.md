@@ -1,6 +1,6 @@
 # Kaijo
 
-**Version 0.3.0**
+**Version 0.4.0**
 
 A fast, simple molecular orbital and molecular structure visualization
 program.
@@ -53,8 +53,9 @@ New formats can be added in `kaijo/formats/` by subclassing
 
 ## Using the program
 
-**Layout.**  Left: the options bar with the orbital list (index, energy in
-hartree, occupation, spin), the *Visible items* and *Camera angle*
+**Layout.**  Left: the options bar with the orbital list (per-spin index,
+symmetry species, energy in hartree, occupation, spin), the *Visible
+items* and *Camera angle*
 sections, the selection/geometry tools and the object properties panel.
 Centre: the main 3D view.  Right: the preview grid (as many columns as
 fit its width — drag the divider to resize; the grid scrolls).  Bottom:
@@ -98,7 +99,12 @@ a range such as `150-160`, `42a`, `12,15,20-25` into the entry) and press
 *Visualize selected orbitals*.  You are prompted for the grid spacing,
 margin and isovalue (sensible defaults are remembered).  Each orbital
 appears as a preview cell as soon as its surface is ready; clicking a cell
-shows it in the main view.  Pressing *Visualize* again with a changed
+shows it in the main view.  Each cell is captioned with the orbital's
+per-spin index, its symmetry species and index, energy and occupation.
+The per-spin index and the symmetry index both count orbitals in file
+order; symmetry is read from the molden `Sym=` labels and defaults to the
+totally symmetric `a` irrep when the file carries no symmetry.  Pressing
+*Visualize* again with a changed
 selection adds the new orbitals and removes the deselected ones; already
 computed volumes are cached on scratch disk, so changing only the isovalue
 re-extracts the surfaces almost instantly.
@@ -163,7 +169,20 @@ applies live and persists between sessions; *Reset to defaults* restores
 the shipped values.  Automatic bonds use the Pyykkö additive covalent
 radii (single, double and triple).
 
-**Export.**  Tick the *export* box of the preview cells you want, then
+**ORCA CAS.**  Tick the *select* box of the orbitals that should form a
+CASSCF active space, then press *Orca CAS* (a tip appears if nothing is
+selected; densities, ESP maps, the structure and geometric objects are
+rejected, as are beta orbitals, since ORCA builds the CASSCF guess from the
+alpha set only).  The window reports the number of selected orbitals, takes
+the number of active electrons (constrained to the parity of the system's
+electron count), and lists the `%scf Rotate` block that swaps the selected
+orbitals into the active space — ready to paste into an ORCA input.  The
+internal (doubly occupied) block size is `(N_elec − N_active) / 2`, with
+`N_elec` read from the orbital occupations so ECP core electrons are
+excluded.  ORCA numbers orbitals from 0, so the indices shown are one less
+than Kaijo's per-spin MO indices (which start at 1); the window states this.
+
+**Export.**  Tick the *select* box of the preview cells you want, then
 *Export images…*.  Options: output folder, base name, image size as a
 multiple of the main-view size (the resulting resolution is shown, with a
 lower bound and a memory guard), transparent or colored background

@@ -33,14 +33,15 @@ class OrbitalPanel(Gtk.Box):
         vbox.set_border_width(4)
         frame.add(vbox)
 
-        self.store = Gtk.ListStore(int, str, str, str, str)
-        # columns: orbital index (hidden), name, energy, occ, spin
+        self.store = Gtk.ListStore(int, str, str, str, str, str)
+        # columns: orbital index (hidden), MO name, symmetry, energy, occ, spin
         self.view = Gtk.TreeView(model=self.store)
         self.view.set_rules_hint(True)
         for i, (title, w) in enumerate(
-                (("MO", 52), ("E / Eh", 86), ("occ", 56), ("spin", 44))):
+                (("MO", 52), ("Sym", 56), ("E / Eh", 86),
+                 ("occ", 56), ("spin", 44))):
             cell = Gtk.CellRendererText()
-            if i in (1, 2):
+            if i in (2, 3):
                 cell.set_property("xalign", 1.0)
             col = Gtk.TreeViewColumn(title, cell, text=i + 1)
             col.set_min_width(w)
@@ -202,7 +203,8 @@ class OrbitalPanel(Gtk.Box):
             if i == homo:
                 name += " (HOMO)"
             self.store.append([
-                int(i), name, f"{orbitals.energies[i]:.4f}",
+                int(i), name, orbitals.sym_name(i),
+                f"{orbitals.energies[i]:.4f}",
                 f"{orbitals.occupations[i]:.3f}", spin])
             if i == homo:
                 homo_row = row
@@ -249,7 +251,7 @@ class OrbitalPanel(Gtk.Box):
             except ValueError:
                 continue
             for i in range(self.orbitals.nmo):
-                if int(self.orbitals.channel_index[i]) in rng and \
+                if int(self.orbitals.spin_index[i]) in rng and \
                         (spin is None or self.orbitals.spins[i] == spin):
                     wanted.add(i)
         sel = self.view.get_selection()
