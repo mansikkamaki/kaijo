@@ -1,6 +1,6 @@
 # Kaijo
 
-**Version 0.4.0**
+**Version 1.0.0**
 
 A fast, simple molecular orbital and molecular structure visualization
 program.
