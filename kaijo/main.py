@@ -17,7 +17,11 @@ def main(argv=None):
         prog="kaijo",
         description="Molecular orbital and structure visualization")
     parser.add_argument("file", nargs="?",
-                        help="molden or xyz file to open")
+                        help="molden, fchk or xyz file to open")
+    parser.add_argument("axis", nargs="?",
+                        help="axis file defining a vector centred on an "
+                             "atom (atom, three components and an optional "
+                             "length in Angstrom)")
     args = parser.parse_args(argv)
 
     warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -30,7 +34,7 @@ def main(argv=None):
 
     app = KaijoApp()
     if args.file:
-        app.set_start_file(args.file)
+        app.set_start_file(args.file, args.axis)
     return app.run(None)
 
 

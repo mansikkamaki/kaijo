@@ -12,6 +12,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
 
 from .. import formats
+from ..formats.axis import AxisError, parse_axis_file
 from ..core.pipeline import GridParams, OrbitalPipeline
 from ..core.scratch import ScratchManager
 from ..core.settings import Settings
@@ -74,6 +75,8 @@ class KaijoWindow(Gtk.ApplicationWindow):
         }
         # field jobs deferred until a running orbital re-extraction ends
         self._pending_field_jobs = []
+        # axis file given on the command line, applied once loading is done
+        self._axis_path = None
 
         self._build_ui()
         self.camera.on_change = self._camera_changed
@@ -297,6 +300,15 @@ class KaijoWindow(Gtk.ApplicationWindow):
         dlg.destroy()
         return False
 
+    def show_warning(self, title, message):
+        dlg = Gtk.MessageDialog(transient_for=self, modal=True,
+                                message_type=Gtk.MessageType.WARNING,
+                                buttons=Gtk.ButtonsType.OK, text=title)
+        dlg.format_secondary_text(message)
+        dlg.run()
+        dlg.destroy()
+        return False
+
     def show_info(self, title, message):
         dlg = Gtk.MessageDialog(transient_for=self, modal=True,
                                 message_type=Gtk.MessageType.INFO,
@@ -323,7 +335,8 @@ class KaijoWindow(Gtk.ApplicationWindow):
 
     # ------------------------------------------------------------- loading
 
-    def open_path(self, path):
+    def open_path(self, path, axis_path=None):
+        self._axis_path = axis_path
         self.show_progress(0.0, f"Loading {os.path.basename(path)}...")
 
         def worker():
@@ -367,7 +380,32 @@ class KaijoWindow(Gtk.ApplicationWindow):
             + (f", {n} molecular orbitals" if n else " (no orbitals)"))
         self.preview.refresh_thumbnails()
         self.update_scratch_label()
+        self._apply_axis_file()
         return False
+
+    def _apply_axis_file(self):
+        """Add the vector described by the axis file given on the command
+        line.  Failures are non-critical: they are reported and the program
+        carries on with the structure alone."""
+        path, self._axis_path = self._axis_path, None
+        if not path:
+            return
+        name = os.path.basename(path)
+        try:
+            spec = parse_axis_file(path)
+            index, warning = spec.resolve_atom(self.scene.molecule)
+        except AxisError as exc:
+            self.show_error(f"Could not read {name}", str(exc))
+            return
+        vec = spec.vector / np.linalg.norm(spec.vector)
+        center = self.scene.molecule.coords[index]
+        item = VectorItem(center - vec / 2, center + vec / 2,
+                          f"Vector {len(self.scene.items)}",
+                          length=spec.length_bohr())
+        # the structure stays selected; the vector only joins the grid
+        self._add_item_command(item, "Add vector", activate=False)
+        if warning:
+            self.show_warning(f"{name}: ambiguous atom", warning)
 
     def _open_clicked(self, *_a):
         dlg = Gtk.FileChooserDialog(title="Open structure/orbital file",
@@ -767,7 +805,7 @@ class KaijoWindow(Gtk.ApplicationWindow):
 
     # ------------------------------------------------------------ geometry
 
-    def _add_item_command(self, item, label):
+    def _add_item_command(self, item, label, activate=True):
         scene = self.scene
 
         def do():
@@ -776,7 +814,10 @@ class KaijoWindow(Gtk.ApplicationWindow):
             self._resort_items()
             self.preview.sync_items()
             self.preview.refresh_one(item)
-            self._item_activated(item)
+            if activate:
+                self._item_activated(item)
+            else:
+                self.preview.set_active_item(self.active_item)
 
         def undo():
             scene.remove_item(item)
@@ -1051,14 +1092,17 @@ class KaijoApp(Gtk.Application):
                          flags=0)
         self.win = None
         self._open_on_start = None
+        self._axis_on_start = None
 
-    def set_start_file(self, path):
+    def set_start_file(self, path, axis_path=None):
         self._open_on_start = path
+        self._axis_on_start = axis_path
 
     def do_activate(self):
         if self.win is None:
             self.win = KaijoWindow(self)
             self.win.show_all()
             if self._open_on_start:
-                self.win.open_path(self._open_on_start)
+                self.win.open_path(self._open_on_start,
+                                   axis_path=self._axis_on_start)
         self.win.present()

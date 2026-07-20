@@ -1,6 +1,6 @@
 # Kaijo
 
-**Version 1.0.0**
+**Version 1.1.0**
 
 A fast, simple molecular orbital and molecular structure visualization
 program.
@@ -26,10 +26,31 @@ pip install --user numpy scipy PyOpenGL scikit-image Pillow
 ## Running
 
 ```sh
-./kaijo-run [file.molden | file.fchk | file.xyz]
+./kaijo-run [file.molden | file.fchk | file.xyz] [file.axis]
 ```
 
 or `python3 -m kaijo.main [file]` from the project directory.
+
+The optional second argument is an **axis file**: a plain-text file
+describing one vector, which is drawn centred on an atom and added to the
+preview grid at start-up (the structure stays selected in the main view).
+The file is free-format -- line breaks and separators do not matter, `#`
+and `!` start comments -- and holds
+
+```
+<atom>  <x> <y> <z>  [length]
+```
+
+where `<atom>` is either a case-insensitive element symbol or a 1-based
+index into the coordinate listing, `<x> <y> <z>` are the vector components
+and the optional `length` is the total drawn length in Ångström (without
+it the magnitude of the components is used, also in Ångström).  Any
+further tokens are ignored.  If the element symbol matches several atoms,
+the first one in the coordinate listing is used and a warning is shown.
+The vector gets the default width and colour and can be edited afterwards
+with the usual object-properties tools.  Failing to read the axis file is
+not fatal: the error is reported in a dialog and Kaijo opens normally with
+the structure alone.
 
 ## Supported files
 
@@ -211,6 +232,7 @@ python3 tests/test_math.py     # solid harmonics + orbital norms (all data files
 python3 tests/test_fields.py   # density / cusp / ESP validation
 python3 tests/test_fchk.py     # fchk loader, cross-validated against molden
 python3 tests/test_render.py   # offscreen render (structure, orbital, geometry)
+python3 tests/test_axis.py     # axis-file parser + start-up vector
 python3 tests/test_gui_flow.py /tmp   # scripted end-to-end GUI flow
 ```
 
